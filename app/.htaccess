@@ -1,0 +1,7 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Force all requests into public folder
+    RewriteCond %{REQUEST_URI} !^/devadmin/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>

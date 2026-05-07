@@ -1,0 +1,22 @@
+name: Iluminar Cron Jobs
+
+on:
+  schedule:
+    - cron: '* * * * *'  # every minute
+  workflow_dispatch:      # allow manual trigger from GitHub UI
+
+jobs:
+  run-crons:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto-publish daily lights
+        run: |
+          curl -s --max-time 30 \
+            "https://codonnier.tech/dipak/iluminar7S/admin/public/cron/auto-publish?token=${{ secrets.CRON_SECRET_TOKEN }}" \
+            || echo "auto-publish request failed"
+
+      - name: Send daily notifications
+        run: |
+          curl -s --max-time 60 \
+            "https://codonnier.tech/dipak/iluminar7S/admin/public/cron/daily-notification?token=${{ secrets.CRON_SECRET_TOKEN }}" \
+            || echo "daily-notification request failed"
