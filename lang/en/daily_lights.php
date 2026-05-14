@@ -36,6 +36,7 @@ return [
     'enter_description' => 'Enter description',
     'optional' => 'Optional',
     'subscriber_only' => 'Subscriber Members Only',
+    'is_feature'            => 'Is Feature?',
     'subscribed_users_only' => 'Only for subscribed users?',
     'subscriber_only_desc' => 'Restrict Step 5 content to Plus members only.',
     'step5_all_required' => 'All Step 5 fields are required when any data is added.',

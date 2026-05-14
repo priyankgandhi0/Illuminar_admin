@@ -80,6 +80,15 @@
                                     value="{{ $d['button_text'] ?? '' }}">
                             </div>
 
+                            {{-- Bullet Point Title --}}
+                            <div class="mb-3">
+                                <label class="dl-label">{{ __('subscription.bullet_point_title') }} <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control sub-bullet-point-title"
+                                    data-lang="{{ $code }}"
+                                    placeholder="{{ __('subscription.bullet_point_title_placeholder') }}"
+                                    value="{{ $d['bullet_point_title'] ?? '' }}">
+                            </div>
+
                             {{-- Bullet Points --}}
                             <div class="mb-3">
                                 <label class="dl-label">{{ __('subscription.bullet_points') }}</label>
@@ -141,6 +150,15 @@
                                     data-lang="{{ $code }}"
                                     placeholder="{{ __('subscription.whatsapp_button_placeholder') }}"
                                     value="{{ $d['wa_button_text'] ?? '' }}">
+                            </div>
+
+                            {{-- WhatsApp Last Text --}}
+                            <div class="mb-3">
+                                <label class="dl-label">{{ __('subscription.whatsapp_last_text') }} <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control sub-wa-last-text"
+                                    data-lang="{{ $code }}"
+                                    placeholder="{{ __('subscription.whatsapp_last_text_placeholder') }}"
+                                    value="{{ $d['wa_last_text'] ?? '' }}">
                             </div>
 
                             {{-- Save Button --}}
@@ -221,15 +239,17 @@ $(document).ready(function () {
                 url: saveUrl,
                 method: 'POST',
                 data: {
-                    _token:         csrf,
-                    lang:           lang,
-                    title:          $panel.find('.sub-title').val().trim(),
-                    subtitle:       $panel.find('.sub-subtitle').val().trim(),
-                    button_text:    $panel.find('.sub-btn-text').val().trim(),
-                    bullets:        bullets,
-                    wa_title:       $panel.find('.sub-wa-title').val().trim(),
-                    wa_subtitle:    $panel.find('.sub-wa-subtitle').val().trim(),
-                    wa_button_text: $panel.find('.sub-wa-btn-text').val().trim(),
+                    _token:              csrf,
+                    lang:                lang,
+                    title:               $panel.find('.sub-title').val().trim(),
+                    subtitle:            $panel.find('.sub-subtitle').val().trim(),
+                    button_text:         $panel.find('.sub-btn-text').val().trim(),
+                    bullet_point_title:  $panel.find('.sub-bullet-point-title').val().trim(),
+                    bullets:             bullets,
+                    wa_title:            $panel.find('.sub-wa-title').val().trim(),
+                    wa_subtitle:         $panel.find('.sub-wa-subtitle').val().trim(),
+                    wa_button_text:      $panel.find('.sub-wa-btn-text').val().trim(),
+                    wa_last_text:        $panel.find('.sub-wa-last-text').val().trim(),
                 },
                 success: function (res) {
                     $('#dlOverlayLoader').removeClass('active');
@@ -272,7 +292,7 @@ $(document).ready(function () {
         $panel.find('.sub-field-error').remove();
     }
 
-    $(document).on('input change', '.sub-title, .sub-subtitle, .sub-btn-text, .sub-wa-title, .sub-wa-subtitle, .sub-wa-btn-text', function () {
+    $(document).on('input change', '.sub-title, .sub-subtitle, .sub-btn-text, .sub-bullet-point-title, .sub-wa-title, .sub-wa-subtitle, .sub-wa-btn-text, .sub-wa-last-text', function () {
         $(this).removeClass('is-invalid');
         $(this).next('.sub-field-error').remove();
     });
@@ -284,20 +304,24 @@ $(document).ready(function () {
 
         clearFieldErrors($panel);
 
-        var title      = $panel.find('.sub-title').val().trim();
-        var subtitle   = $panel.find('.sub-subtitle').val().trim();
-        var buttonText = $panel.find('.sub-btn-text').val().trim();
-        var waTitle      = $panel.find('.sub-wa-title').val().trim();
-        var waSubtitle   = $panel.find('.sub-wa-subtitle').val().trim();
-        var waButtonText = $panel.find('.sub-wa-btn-text').val().trim();
+        var title            = $panel.find('.sub-title').val().trim();
+        var subtitle         = $panel.find('.sub-subtitle').val().trim();
+        var buttonText       = $panel.find('.sub-btn-text').val().trim();
+        var bulletPointTitle = $panel.find('.sub-bullet-point-title').val().trim();
+        var waTitle          = $panel.find('.sub-wa-title').val().trim();
+        var waSubtitle       = $panel.find('.sub-wa-subtitle').val().trim();
+        var waButtonText     = $panel.find('.sub-wa-btn-text').val().trim();
+        var waLastText       = $panel.find('.sub-wa-last-text').val().trim();
 
         var hasError = false;
-        if (!title)        { showFieldError($panel.find('.sub-title'),       requiredMsg); hasError = true; }
-        if (!subtitle)     { showFieldError($panel.find('.sub-subtitle'),    requiredMsg); hasError = true; }
-        if (!buttonText)   { showFieldError($panel.find('.sub-btn-text'),    requiredMsg); hasError = true; }
-        if (!waTitle)      { showFieldError($panel.find('.sub-wa-title'),    requiredMsg); hasError = true; }
-        if (!waSubtitle)   { showFieldError($panel.find('.sub-wa-subtitle'), requiredMsg); hasError = true; }
-        if (!waButtonText) { showFieldError($panel.find('.sub-wa-btn-text'), requiredMsg); hasError = true; }
+        if (!title)            { showFieldError($panel.find('.sub-title'),                requiredMsg); hasError = true; }
+        if (!subtitle)         { showFieldError($panel.find('.sub-subtitle'),             requiredMsg); hasError = true; }
+        if (!buttonText)       { showFieldError($panel.find('.sub-btn-text'),             requiredMsg); hasError = true; }
+        if (!bulletPointTitle) { showFieldError($panel.find('.sub-bullet-point-title'),   requiredMsg); hasError = true; }
+        if (!waTitle)          { showFieldError($panel.find('.sub-wa-title'),             requiredMsg); hasError = true; }
+        if (!waSubtitle)       { showFieldError($panel.find('.sub-wa-subtitle'),          requiredMsg); hasError = true; }
+        if (!waButtonText)     { showFieldError($panel.find('.sub-wa-btn-text'),          requiredMsg); hasError = true; }
+        if (!waLastText)       { showFieldError($panel.find('.sub-wa-last-text'),         requiredMsg); hasError = true; }
         if (hasError) return;
 
         var bullets = [];
@@ -318,15 +342,17 @@ $(document).ready(function () {
             url: saveUrl,
             method: 'POST',
             data: {
-                _token:        csrf,
-                lang:          lang,
-                title:         title,
-                subtitle:      subtitle,
-                button_text:   buttonText,
-                bullets:       bullets,
-                wa_title:      waTitle,
-                wa_subtitle:   waSubtitle,
-                wa_button_text: waButtonText,
+                _token:             csrf,
+                lang:               lang,
+                title:              title,
+                subtitle:           subtitle,
+                button_text:        buttonText,
+                bullet_point_title: bulletPointTitle,
+                bullets:            bullets,
+                wa_title:           waTitle,
+                wa_subtitle:        waSubtitle,
+                wa_button_text:     waButtonText,
+                wa_last_text:       waLastText,
             },
             success: function (res) {
                 $('#dlOverlayLoader').removeClass('active');

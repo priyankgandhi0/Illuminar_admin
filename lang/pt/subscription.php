@@ -1,15 +1,17 @@
 <?php
 
 return [
-    'page_title'         => 'Detalhes da Assinatura',
+    'page_title'         => 'Telas de Conversão',
     'title'              => 'Título',
     'title_placeholder'  => 'Ex: Desbloqueie Todo o Conteúdo',
     'subtitle'           => 'Subtítulo',
     'subtitle_placeholder' => 'Ex: Acesse todos os recursos premium',
     'button_text'        => 'Texto do Botão',
     'button_placeholder' => 'Ex: Assinar Agora',
-    'bullet_points'      => 'Benefícios (Pontos)',
-    'bullet_placeholder' => 'Ex: Acesso ilimitado a Jornadas',
+    'bullet_point_title'         => 'Título da Seção de Benefícios',
+    'bullet_point_title_placeholder' => 'Ex: O que você vai receber',
+    'bullet_points'              => 'Benefícios (Pontos)',
+    'bullet_placeholder'         => 'Ex: Acesso ilimitado a Jornadas',
     'add_bullet'         => 'Adicionar Ponto',
     'remove_bullet'             => 'Remover Ponto',
     'remove_bullet_confirm'     => 'Tem certeza que deseja remover este ponto?',
@@ -27,4 +29,6 @@ return [
     'whatsapp_subtitle_placeholder' => 'Ex: Inicie uma conversa com nossa equipe no WhatsApp...',
     'whatsapp_button_text'        => 'Texto do Botão',
     'whatsapp_button_placeholder' => 'Ex: Conversar no WhatsApp',
+    'whatsapp_last_text'          => 'Texto Final',
+    'whatsapp_last_text_placeholder' => 'Ex: Sem compromisso. Cancele quando quiser.',
 ];

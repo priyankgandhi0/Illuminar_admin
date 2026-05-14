@@ -3,10 +3,10 @@
 return [
     // Sidebar
     'dashboard' => 'Painel',
-    'subscription_details' => 'Detalhes da Assinatura',
+    'subscription_details' => 'Telas de Conversão',
     'users' => 'Usuários',
     'daily_lights' => 'Luz do Dia',
-    'daily_light_categories' => 'Categorias Luz do Dia',
+    'daily_light_categories' => 'Ícones Luz do Dia',
     'jornadas_categories' => 'Categorias Jornadas',
     'jornadas' => 'Jornadas',
     'logout' => 'Sair',

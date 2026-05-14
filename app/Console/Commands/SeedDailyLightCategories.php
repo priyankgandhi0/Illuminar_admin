@@ -47,7 +47,7 @@ class SeedDailyLightCategories extends Command
             ],
             [
                 'pt_title' => 'Bênção da Noite',
-                'en_title' => 'Evening Blessing',
+                'en_title' => 'Evening  Blessing',
                 'es_title' => 'Bendición Vespertina',
                 'icon' => $this->eveningBlessingSvg(),
             ],

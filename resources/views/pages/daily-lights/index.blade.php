@@ -95,7 +95,6 @@
                                     <th>{{ __('common.date') }}</th>
                                     <th>{{ __('common.title') }}</th>
                                     <th>{{ __('common.languages') }}</th>
-                                    <th>{{ __('common.featured') }}</th>
                                     <th>{{ __('common.status') }}</th>
                                     <th width="110">{{ __('common.action') }}</th>
                                 </tr>
@@ -116,14 +115,6 @@
                                         @foreach($item['languages'] as $lang)
                                             <span class="dl-lang-badge dl-lang-{{ $lang }}">{{ strtoupper($lang) }}</span>
                                         @endforeach
-                                    </td>
-                                    <td data-label="{{ __('common.featured') }}">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input toggle-status dl-featured-toggle"
-                                                type="checkbox"
-                                                data-id="{{ $item['id'] }}"
-                                                {{ !empty($item['isFeatured']) ? 'checked' : '' }}>
-                                        </div>
                                     </td>
                                     <td data-label="{{ __('common.status') }}">
                                         @if($item['status'] === 'published')
@@ -185,7 +176,7 @@ $(document).ready(function() {
 
     var table = $('#dailyLightsTable').DataTable({
         order: [[1, 'desc']],
-        columnDefs: [{ orderable: false, targets: [0, 4, 6] }],
+        columnDefs: [{ orderable: false, targets: [0, 5] }],
         language: {
             search: Lang.dt_search,
             searchPlaceholder: "{{ __('daily_lights.search_placeholder') }}",
@@ -206,50 +197,6 @@ $(document).ready(function() {
         }
     });
 
-    // Featured toggle with confirmation
-    $(document).on('change', '.dl-featured-toggle', function() {
-        var $toggle = $(this);
-        var id = $toggle.data('id');
-        var isFeatured = $toggle.is(':checked');
-        var actionText = isFeatured ? Lang.confirm_featured_mark_dl : Lang.confirm_featured_remove_dl;
-
-        // Revert immediately until the admin confirms
-        $toggle.prop('checked', !isFeatured);
-
-        Swal.fire({
-            title: Lang.are_you_sure,
-            text: actionText,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonColor: '#c6a55a',
-            cancelButtonColor: '#6b7280',
-            confirmButtonText: Lang.yes_confirm
-        }).then(function(result) {
-            if (result.isConfirmed) {
-                $toggle.prop('checked', isFeatured);
-                $.ajax({
-                    url: '{{ url("daily-lights") }}/' + id + '/toggle-featured',
-                    type: 'POST',
-                    data: {
-                        _token: $('meta[name="csrf-token"]').attr('content'),
-                        isFeatured: isFeatured ? 1 : 0
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            toastr.success(Lang.featured_updated_dl);
-                        } else {
-                            toastr.error(Lang.failed_featured_dl);
-                            $toggle.prop('checked', !isFeatured);
-                        }
-                    },
-                    error: function() {
-                        toastr.error(Lang.failed_featured_dl);
-                        $toggle.prop('checked', !isFeatured);
-                    }
-                });
-            }
-        });
-    });
 
     /* Daily Notification JS (commented out)
     // Edit button - open modal

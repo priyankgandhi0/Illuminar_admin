@@ -751,54 +751,83 @@ $(document).ready(function() {
                 .replace(':total', count) + attemptLabel
         );
 
-        // STEP 1: GET SIGNED URL FROM LARAVEL
-        $.ajax({
-            url: uploadUrl,
-            method: 'POST',
-            data: {
-                _token: getCsrf(),
-                file_name: file.name,
-                file_type: file.type,
-                lang: lang,
-                type: 'lesson_audio',
-                lesson_index: index
-            },
+        // CHECK IF FILE IS AUDIO
+        if (file.type.startsWith('audio/')) {
 
-            success: function(res) {
+            getAudioDuration(file, function(duration) {
 
-                if (!res.success) {
+                startUpload(duration);
 
-                    retryOrFail();
-                    return;
-                }
+            });
 
-                // STEP 2: DIRECT UPLOAD TO CLOUD STORAGE
-                fetch(res.upload_url, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': file.type
-                    },
-                    body: file
-                })
-                .then(response => {
+        } else {
 
-                    if (!response.ok) {
-                        throw new Error('Upload failed');
+            // IMAGE / OTHER FILE
+            startUpload('00:00');
+        }
+
+        /**
+         * START ACTUAL UPLOAD
+         */
+        function startUpload(duration) {
+
+            // STEP 1: GET SIGNED URL FROM LARAVEL
+            $.ajax({
+                url: uploadUrl,
+                method: 'POST',
+                data: {
+                    _token: getCsrf(),
+                    file_name: file.name,
+                    file_type: file.type,
+                    lang: lang,
+                    type: 'lesson_audio',
+                    lesson_index: index,
+                    audio_duration: duration
+                },
+
+                success: function(res) {
+
+                    if (!res.success) {
+
+                        retryOrFail();
+                        return;
                     }
 
-                    onSuccess(res.storage_key, '00:00'); // duration optional
+                    // STEP 2: DIRECT UPLOAD TO CLOUD STORAGE
+                    fetch(res.upload_url, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': file.type
+                        },
+                        body: file
+                    })
+                    .then(response => {
 
-                })
-                .catch(err => {
+                        if (!response.ok) {
+                            throw new Error('Upload failed');
+                        }
+
+                        // RETURN STORAGE KEY + DURATION
+                        onSuccess(
+                            res.storage_key,
+                            duration || '00:00'
+                        );
+
+                    })
+                    .catch(err => {
+                        retryOrFail();
+                    });
+                },
+
+                error: function() {
                     retryOrFail();
-                });
-            },
+                }
+            });
+        }
 
-            error: function() {
-                retryOrFail();
-            }
-        });
-
+        /**
+         * RETRY HANDLER
+         */
         function retryOrFail() {
 
             if (attempt + 1 < maxAttempts) {
@@ -819,9 +848,44 @@ $(document).ready(function() {
                 }, 2000);
 
             } else {
+
                 onError('Upload failed after retries');
             }
         }
+    }
+
+    /**
+     * GET AUDIO DURATION
+     */
+    function getAudioDuration(file, callback) {
+
+        var audio = document.createElement('audio');
+
+        audio.preload = 'metadata';
+
+        audio.onloadedmetadata = function () {
+
+            window.URL.revokeObjectURL(audio.src);
+
+            var totalSeconds = Math.round(audio.duration);
+
+            var minutes = Math.floor(totalSeconds / 60);
+            var seconds = totalSeconds % 60;
+
+            var formatted =
+                String(minutes).padStart(2, '0') +
+                ':' +
+                String(seconds).padStart(2, '0');
+
+            callback(formatted);
+        };
+
+        audio.onerror = function () {
+
+            callback('00:00');
+        };
+
+        audio.src = URL.createObjectURL(file);
     }
 
     function saveLangData(docId, lessonDocId, lang, coverKey, audioResults, langs, index) {

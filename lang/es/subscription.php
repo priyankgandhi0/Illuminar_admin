@@ -1,15 +1,17 @@
 <?php
 
 return [
-    'page_title'           => 'Detalles de Suscripción',
+    'page_title'           => 'Telas de Conversão',
     'title'                => 'Título',
     'title_placeholder'    => 'Ej: Desbloquea Todo el Contenido',
     'subtitle'             => 'Subtítulo',
     'subtitle_placeholder' => 'Ej: Accede a todas las funciones premium',
     'button_text'          => 'Texto del Botón',
     'button_placeholder'   => 'Ej: Suscribirse Ahora',
-    'bullet_points'        => 'Beneficios (Puntos)',
-    'bullet_placeholder'   => 'Ej: Acceso ilimitado a Jornadas',
+    'bullet_point_title'             => 'Título de la Sección de Beneficios',
+    'bullet_point_title_placeholder' => 'Ej: Lo que vas a recibir',
+    'bullet_points'                  => 'Beneficios (Puntos)',
+    'bullet_placeholder'             => 'Ej: Acceso ilimitado a Jornadas',
     'add_bullet'           => 'Agregar Punto',
     'remove_bullet'             => 'Eliminar Punto',
     'remove_bullet_confirm'     => '¿Estás seguro de que deseas eliminar este punto?',
@@ -25,6 +27,8 @@ return [
     'whatsapp_title_placeholder'    => 'Ej: Continuar este viaje',
     'whatsapp_subtitle'             => 'Subtítulo',
     'whatsapp_subtitle_placeholder' => 'Ej: Inicia una conversación con nuestro equipo en WhatsApp...',
-    'whatsapp_button_text'        => 'Texto del Botón',
-    'whatsapp_button_placeholder' => 'Ej: Chatear en WhatsApp',
+    'whatsapp_button_text'           => 'Texto del Botón',
+    'whatsapp_button_placeholder'    => 'Ej: Chatear en WhatsApp',
+    'whatsapp_last_text'             => 'Texto Final',
+    'whatsapp_last_text_placeholder' => 'Ej: Sin compromiso. Cancela cuando quieras.',
 ];

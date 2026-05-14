@@ -228,7 +228,17 @@
                                 @if($i === 5)
                                 @php
                                     $forSubscribe = $isEdit ? ($sec['forSubscribeMember'] ?? false) : false;
+                                    $isFeature    = $isEdit ? ($dailyLight['isFeatured'] ?? false) : true;
                                 @endphp
+                                <label class="d-flex align-items-center gap-2 m-0" for="isFeature_{{ $code }}" style="cursor:pointer;">
+                                    <input type="checkbox" id="isFeature_{{ $code }}" name="is_feature_{{ $code }}" value="1"
+                                        style="width:17px;height:17px;cursor:pointer;accent-color:#d4a528;flex-shrink:0;"
+                                        {{ $isFeature ? 'checked' : '' }}
+                                        {{ $isReadonly ? 'disabled' : '' }}>
+                                    <span class="fw-bold" style="font-size:15px;color:#5a4a2f;white-space:nowrap;">
+                                        <i class="bi bi-star me-1" style="color:#d4a528;font-size:13px;"></i>{{ __('daily_lights.is_feature') }}
+                                    </span>
+                                </label>
                                 <label class="d-flex align-items-center gap-2 m-0" id="subscriberBox_{{ $code }}" for="forSubscribeMember_{{ $code }}" style="cursor:pointer;">
                                     <input type="checkbox" id="forSubscribeMember_{{ $code }}" name="forSubscribeMember_{{ $code }}" value="1"
                                         class="subscriber-check"

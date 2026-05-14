@@ -22,20 +22,22 @@ class SubscriptionController extends Controller
 
     public function save(Request $request)
     {
-        $lang         = $request->input('lang');
-        $title        = $request->input('title', '');
-        $subtitle     = $request->input('subtitle', '');
-        $buttonText   = $request->input('button_text', '');
-        $bullets      = $request->input('bullets', []);
-        $waTitle      = $request->input('wa_title', '');
-        $waSubtitle   = $request->input('wa_subtitle', '');
-        $waButtonText = $request->input('wa_button_text', '');
+        $lang             = $request->input('lang');
+        $title            = $request->input('title', '');
+        $subtitle         = $request->input('subtitle', '');
+        $buttonText       = $request->input('button_text', '');
+        $bullets          = $request->input('bullets', []);
+        $bulletPointTitle = $request->input('bullet_point_title', '');
+        $waTitle          = $request->input('wa_title', '');
+        $waSubtitle       = $request->input('wa_subtitle', '');
+        $waButtonText     = $request->input('wa_button_text', '');
+        $waLastText       = $request->input('wa_last_text', '');
 
         if (!in_array($lang, ['pt', 'en', 'es'])) {
             return response()->json(['success' => false, 'message' => 'Invalid language.']);
         }
 
-        $ok = $this->firestore->saveSubscriptionTranslation($lang, $title, $subtitle, $buttonText, $bullets, $waTitle, $waSubtitle, $waButtonText);
+        $ok = $this->firestore->saveSubscriptionTranslation($lang, $title, $subtitle, $buttonText, $bullets, $waTitle, $waSubtitle, $waButtonText, $bulletPointTitle, $waLastText);
 
         if ($ok) {
             return response()->json(['success' => true, 'message' => __('subscription.saved_success')]);

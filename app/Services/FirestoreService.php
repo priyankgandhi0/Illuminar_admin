@@ -2188,32 +2188,36 @@ public function getUserFilesMap(): array
                     'title'              => $fields['subscription_title']['stringValue'] ?? '',
                     'subtitle'           => $fields['subscription_subtitle']['stringValue'] ?? '',
                     'button_text'        => $fields['subscription_button_text']['stringValue'] ?? '',
+                    'bullet_point_title' => $fields['subscription_bullet_point_title']['stringValue'] ?? '',
                     'bullets'            => $bullets,
-                    'wa_title'       => $fields['whatsapp_title']['stringValue'] ?? '',
-                    'wa_subtitle'    => $fields['whatsapp_subtitle']['stringValue'] ?? '',
-                    'wa_button_text' => $fields['whatsapp_button_text']['stringValue'] ?? '',
+                    'wa_title'           => $fields['whatsapp_title']['stringValue'] ?? '',
+                    'wa_subtitle'        => $fields['whatsapp_subtitle']['stringValue'] ?? '',
+                    'wa_button_text'     => $fields['whatsapp_button_text']['stringValue'] ?? '',
+                    'wa_last_text'       => $fields['whatsapp_last_text']['stringValue'] ?? '',
                 ];
             } else {
-                $result[$lang] = ['title' => '', 'subtitle' => '', 'button_text' => '', 'bullets' => [], 'wa_title' => '', 'wa_subtitle' => '', 'wa_button_text' => ''];
+                $result[$lang] = ['title' => '', 'subtitle' => '', 'button_text' => '', 'bullet_point_title' => '', 'bullets' => [], 'wa_title' => '', 'wa_subtitle' => '', 'wa_button_text' => '', 'wa_last_text' => ''];
             }
         }
         return $result;
     }
 
-    public function saveSubscriptionTranslation(string $lang, string $title, string $subtitle, string $buttonText, array $bullets, string $waTitle = '', string $waSubtitle = '', string $waButtonText = ''): bool
+    public function saveSubscriptionTranslation(string $lang, string $title, string $subtitle, string $buttonText, array $bullets, string $waTitle = '', string $waSubtitle = '', string $waButtonText = '', string $bulletPointTitle = '', string $waLastText = ''): bool
     {
         $token = GoogleAccessTokenService::generate();
         $bulletValues = array_map(fn($b) => ['stringValue' => $b], array_values(array_filter($bullets, fn($b) => trim($b) !== '')));
 
         $fields = [
-            'subscription_title'         => ['stringValue' => $title],
-            'subscription_subtitle'      => ['stringValue' => $subtitle],
-            'subscription_button_text'   => ['stringValue' => $buttonText],
-            'subscription_bullet_points' => ['arrayValue'  => ['values' => $bulletValues]],
-            'whatsapp_title'       => ['stringValue' => $waTitle],
-            'whatsapp_subtitle'    => ['stringValue' => $waSubtitle],
-            'whatsapp_button_text' => ['stringValue' => $waButtonText],
-            'updatedAt'                  => ['timestampValue' => now()->toIso8601String()],
+            'subscription_title'              => ['stringValue' => $title],
+            'subscription_subtitle'           => ['stringValue' => $subtitle],
+            'subscription_button_text'        => ['stringValue' => $buttonText],
+            'subscription_bullet_point_title' => ['stringValue' => $bulletPointTitle],
+            'subscription_bullet_points'      => ['arrayValue'  => ['values' => $bulletValues]],
+            'whatsapp_title'                  => ['stringValue' => $waTitle],
+            'whatsapp_subtitle'               => ['stringValue' => $waSubtitle],
+            'whatsapp_button_text'            => ['stringValue' => $waButtonText],
+            'whatsapp_last_text'              => ['stringValue' => $waLastText],
+            'updatedAt'                       => ['timestampValue' => now()->toIso8601String()],
         ];
 
         // Check if doc exists; if not, add createdAt
