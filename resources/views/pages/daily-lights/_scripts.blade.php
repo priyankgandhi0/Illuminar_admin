@@ -773,43 +773,118 @@ $(document).ready(function() {
     }
 
     // Upload a single file and return a promise with the storage key
+    // function uploadSingleFile(docId, lang, fileInfo) {
+    //     return new Promise(function(resolve, reject) {
+    //         var fd = new FormData();
+    //         fd.append('_token', csrfToken);
+    //         fd.append('lang', lang);
+    //         fd.append('step', fileInfo.step);
+    //         fd.append('type', fileInfo.type);
+    //         fd.append('file', fileInfo.file);
+
+    //         var url = uploadFileUrlBase.replace('__ID__', docId);
+
+    //         $.ajax({
+    //             url: url,
+    //             type: 'POST',
+    //             data: fd,
+    //             processData: false,
+    //             contentType: false,
+    //             headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+    //             timeout: 120000,
+    //             success: function(resp) {
+    //                 if (resp.success) {
+    //                     resolve({
+    //                         step: fileInfo.step,
+    //                         type: fileInfo.type,
+    //                         storageKey: resp.storageKey,
+    //                         audioDuration: resp.audioDuration || ''
+    //                     });
+    //                 } else {
+    //                     reject(resp.message || Lang.something_wrong);
+    //                 }
+    //             },
+    //             error: function(xhr) {
+    //                 var msg = Lang.something_wrong;
+    //                 if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+    //                 reject(msg);
+    //             }
+    //         });
+    //     });
+    // }
+
     function uploadSingleFile(docId, lang, fileInfo) {
-        return new Promise(function(resolve, reject) {
-            var fd = new FormData();
-            fd.append('_token', csrfToken);
-            fd.append('lang', lang);
-            fd.append('step', fileInfo.step);
-            fd.append('type', fileInfo.type);
-            fd.append('file', fileInfo.file);
 
-            var url = uploadFileUrlBase.replace('__ID__', docId);
+        return new Promise(async function(resolve, reject) {
 
-            $.ajax({
-                url: url,
-                type: 'POST',
-                data: fd,
-                processData: false,
-                contentType: false,
-                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-                timeout: 120000,
-                success: function(resp) {
-                    if (resp.success) {
-                        resolve({
-                            step: fileInfo.step,
-                            type: fileInfo.type,
-                            storageKey: resp.storageKey,
-                            audioDuration: resp.audioDuration || ''
-                        });
-                    } else {
-                        reject(resp.message || Lang.something_wrong);
-                    }
-                },
-                error: function(xhr) {
-                    var msg = Lang.something_wrong;
-                    if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
-                    reject(msg);
+            try {
+
+                // STEP 1: Request presigned upload URL
+
+                var fd = new FormData();
+
+                fd.append('_token', csrfToken);
+                fd.append('lang', lang);
+                fd.append('step', fileInfo.step);
+                fd.append('type', fileInfo.type);
+
+                fd.append('file_name', fileInfo.file.name);
+                fd.append('file_type', fileInfo.file.type);
+
+                var url = uploadFileUrlBase.replace('__ID__', docId);
+
+                const presignedResp = await $.ajax({
+                    url: url,
+                    type: 'POST',
+                    data: fd,
+                    processData: false,
+                    contentType: false,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    timeout: 120000
+                });
+
+                if (!presignedResp.success) {
+                    reject(presignedResp.message || Lang.something_wrong);
+                    return;
                 }
-            });
+
+                // STEP 2: Upload directly to R2
+
+                const uploadResponse = await fetch(presignedResp.upload_url, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': fileInfo.file.type
+                    },
+                    body: fileInfo.file
+                });
+
+                if (!uploadResponse.ok) {
+                    reject('File upload failed.');
+                    return;
+                }
+
+                // STEP 3: Resolve final response
+
+                resolve({
+                    step: fileInfo.step,
+                    type: fileInfo.type,
+                    storageKey: presignedResp.storage_key,
+                    audioDuration: ''
+                });
+
+            } catch (xhr) {
+
+                var msg = Lang.something_wrong;
+
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    msg = xhr.responseJSON.message;
+                }
+
+                reject(msg);
+            }
         });
     }
 
@@ -901,6 +976,7 @@ $(document).ready(function() {
         mainFd.append('publishTime', $('#publishTime').val() || '');
         mainFd.append('is_edit', isEdit ? '1' : '0');
         mainFd.append('edit_id', editId);
+        mainFd.append('is_feature', $('input[name="is_feature_pt"]').is(':checked') ? '1' : '0');
         enabledLangs.forEach(function(l) {
             mainFd.append('lang_enabled_' + l, '1');
         });

@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Services\FirestoreService;
 use App\Services\FileStorageService;
 use Illuminate\Support\Facades\Storage;
+use Aws\S3\S3Client;
 
 class JornadaController extends Controller
 {
@@ -15,11 +16,13 @@ class JornadaController extends Controller
     public function __construct(FirestoreService $firestore, FileStorageService $fileStorage)
     {
         $this->firestore = $firestore;
+
         $this->fileStorage = $fileStorage;
     }
 
     public function index()
     {
+
         $items = $this->firestore->getJornadas();
 
         // Build category map for PT names and order
@@ -49,10 +52,27 @@ class JornadaController extends Controller
         }
 
         // Sort by category order first, then journey order within each category
+        // usort($jornadas, function ($a, $b) {
+        //     if ($a['categoryOrder'] !== $b['categoryOrder']) return $a['categoryOrder'] <=> $b['categoryOrder'];
+        //     if ($a['order'] !== $b['order']) return $a['order'] <=> $b['order'];
+        //     return strcmp($b['createdAt'], $a['createdAt']);
+        // });
+
         usort($jornadas, function ($a, $b) {
-            if ($a['categoryOrder'] !== $b['categoryOrder']) return $a['categoryOrder'] <=> $b['categoryOrder'];
-            if ($a['order'] !== $b['order']) return $a['order'] <=> $b['order'];
-            return strcmp($b['createdAt'], $a['createdAt']);
+
+            // Latest createdAt first (DESC)
+            if ($a['createdAt'] !== $b['createdAt']) {
+                return strcmp($b['createdAt'], $a['createdAt']);
+            }
+
+            // categoryOrder ASC
+            if ($a['categoryOrder'] !== $b['categoryOrder']) {
+                return $a['categoryOrder'] <=> $b['categoryOrder'];
+            }
+
+            // order ASC
+            return $a['order'] <=> $b['order'];
+            
         });
 
         $categoryNames = array_unique(array_filter(array_values($categoryMap)));
@@ -571,39 +591,77 @@ class JornadaController extends Controller
     /**
      * Step 2a: Upload a single file (cover image or lesson audio).
      */
+    // public function uploadFile(Request $request, string $id)
+    // {
+    //     ini_set('max_execution_time', 300);
+    //     ini_set('max_input_time', 300);
+    //     ini_set('memory_limit', '512M');
+
+    //     $lang  = $request->input('lang');
+    //     $type  = $request->input('type'); // 'cover_image' or 'lesson_audio'
+    //     $lessonIndex = (int) $request->input('lesson_index', 0);
+
+    //     if (!in_array($lang, ['pt', 'en', 'es'])) {
+    //         return response()->json(['success' => false, 'message' => 'Invalid lang'], 422);
+    //     }
+
+    //     try {
+    //         if ($type === 'cover_image' && $request->hasFile('file')) {
+    //             $request->validate(['file' => 'required|image|max:5120']);
+    //             $uploaded = $this->fileStorage->uploadJornadaFile($request->file('file'), $id, $lang);
+    //             return response()->json(['success' => true, 'storage_key' => $uploaded['storage_key'], 'type' => 'cover_image', 'lang' => $lang]);
+    //         }
+
+    //         if ($type === 'lesson_audio' && $request->hasFile('file')) {
+    //             $request->validate(['file' => 'required|file|mimes:mp3,wav,m4a,aac,ogg,opus,mp4|max:51200']);
+    //             $file = $request->file('file');
+    //             $audioDuration = $this->getAudioDuration($file->getPathname());
+    //             $uploaded = $this->fileStorage->uploadJornadaFile($file, $id, $lang, "lesson_{$lessonIndex}");
+    //             return response()->json(['success' => true, 'storage_key' => $uploaded['storage_key'], 'audio_duration' => $audioDuration, 'type' => 'lesson_audio', 'lang' => $lang, 'lesson_index' => $lessonIndex]);
+    //         }
+
+    //         return response()->json(['success' => false, 'message' => 'No valid file provided'], 422);
+    //     } catch (\Exception $e) {
+    //         \Log::error('Jornada uploadFile exception', ['lang' => $lang, 'type' => $type, 'error' => $e->getMessage()]);
+    //         return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+    //     }
+    // }
+
     public function uploadFile(Request $request, string $id)
     {
-        ini_set('max_execution_time', 300);
-        ini_set('memory_limit', '512M');
+        $request->validate([
+            'file_name' => 'required',
+            'file_type' => 'required',
+            'lang' => 'required'
+        ]);
 
-        $lang  = $request->input('lang');
-        $type  = $request->input('type'); // 'cover_image' or 'lesson_audio'
-        $lessonIndex = (int) $request->input('lesson_index', 0);
+        $fileName = time() . '_' . $request->file_name;
 
-        if (!in_array($lang, ['pt', 'en', 'es'])) {
-            return response()->json(['success' => false, 'message' => 'Invalid lang'], 422);
-        }
+        $key = "jornadas/{$id}/{$request->lang}/{$fileName}";
 
-        try {
-            if ($type === 'cover_image' && $request->hasFile('file')) {
-                $request->validate(['file' => 'required|image|max:5120']);
-                $uploaded = $this->fileStorage->uploadJornadaFile($request->file('file'), $id, $lang);
-                return response()->json(['success' => true, 'storage_key' => $uploaded['storage_key'], 'type' => 'cover_image', 'lang' => $lang]);
-            }
+        $s3 = new S3Client([
+            'version' => 'latest',
+            'region' => env('R2_REGION'),
+            'endpoint' => env('R2_ENDPOINT'),
+            'credentials' => [
+                'key' => env('R2_ACCESS_KEY_ID'),
+                'secret' => env('R2_SECRET_ACCESS_KEY'),
+            ],
+        ]);
 
-            if ($type === 'lesson_audio' && $request->hasFile('file')) {
-                $request->validate(['file' => 'required|file|mimes:mp3,wav,m4a,aac,ogg,opus,mp4|max:51200']);
-                $file = $request->file('file');
-                $audioDuration = $this->getAudioDuration($file->getPathname());
-                $uploaded = $this->fileStorage->uploadJornadaFile($file, $id, $lang, "lesson_{$lessonIndex}");
-                return response()->json(['success' => true, 'storage_key' => $uploaded['storage_key'], 'audio_duration' => $audioDuration, 'type' => 'lesson_audio', 'lang' => $lang, 'lesson_index' => $lessonIndex]);
-            }
+        $command = $s3->getCommand('PutObject', [
+            'Bucket' => env('R2_BUCKET'),
+            'Key' => $key,
+            'ContentType' => $request->file_type,
+        ]);
 
-            return response()->json(['success' => false, 'message' => 'No valid file provided'], 422);
-        } catch (\Exception $e) {
-            \Log::error('Jornada uploadFile exception', ['lang' => $lang, 'type' => $type, 'error' => $e->getMessage()]);
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
+        $signedUrl = $s3->createPresignedRequest($command, '+20 minutes');
+
+        return response()->json([
+            'success' => true,
+            'upload_url' => (string) $signedUrl->getUri(),
+            'storage_key' => $key,
+        ]);
     }
 
     /**

@@ -36,6 +36,7 @@ return [
     'enter_description' => 'Digite a descrição',
     'optional' => 'Opcional',
     'subscriber_only' => 'Apenas Membros Assinantes',
+    'is_feature'            => 'Incluir Áudio Plus?', // 'É Destaque?',
     'subscribed_users_only' => 'Apenas para usuários assinantes?',
     'subscriber_only_desc' => 'Restringir conteúdo da Etapa 5 apenas para membros Plus.',
     'step5_all_required' => 'Todos os campos da Etapa 5 são obrigatórios quando algum dado é adicionado.',

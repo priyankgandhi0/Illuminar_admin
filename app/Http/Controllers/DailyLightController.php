@@ -9,6 +9,7 @@ use App\Services\DateTimeService;
 use App\Services\NotificationService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Cache;
+use Aws\S3\S3Client;
 
 class DailyLightController extends Controller
 {
@@ -344,7 +345,7 @@ class DailyLightController extends Controller
                 $mainFields = [
                     'publishDateTimeUtc' => ['stringValue' => $newUtcDatetime],
                     'status' => ['stringValue' => $status],
-                    'isFeatured' => $existingData['main']['isFeatured'] ?? ['booleanValue' => true],
+                    'isFeatured' => ['booleanValue' => $request->boolean('is_feature')],
                     'createdAt' => $existingData['main']['createdAt'] ?? ['timestampValue' => now()->toIso8601String()],
                 ];
 
@@ -393,7 +394,7 @@ class DailyLightController extends Controller
                     'publishDateTimeUtc' => ['stringValue' => $newUtcDatetime],
                     'status' => ['stringValue' => $status],
                     'isDeleted' => ['booleanValue' => false],
-                    'isFeatured' => ['booleanValue' => true],
+                    'isFeatured' => ['booleanValue' => $request->boolean('is_feature')],
                     'createdAt' => ['timestampValue' => now()->toIso8601String()],
                 ];
 
@@ -415,54 +416,124 @@ class DailyLightController extends Controller
      * Step 2a: Upload a single file (image or audio). Returns JSON with storageKey.
      * Each file is uploaded individually to stay within nginx body size limits.
      */
+    // public function uploadFile(Request $request, string $id)
+    // {
+    //     ini_set('max_execution_time', 120);
+    //     ini_set('memory_limit', '256M');
+    //     set_time_limit(120);
+
+    //     $lang = $request->input('lang');
+    //     $step = (int) $request->input('step');
+    //     $type = $request->input('type'); // image, bgImage, audio
+
+    //     if (!in_array($lang, ['pt', 'en', 'es']) || $step < 1 || $step > 5 || !in_array($type, ['image', 'bgImage', 'audio'])) {
+    //         return response()->json(['success' => false, 'message' => 'Invalid parameters.'], 422);
+    //     }
+
+    //     if (!$request->hasFile('file')) {
+    //         return response()->json(['success' => false, 'message' => 'No file provided.'], 422);
+    //     }
+
+    //     $file = $request->file('file');
+
+    //     // Validate based on type
+    //     if ($type === 'audio') {
+    //         $request->validate(['file' => 'required|file|mimes:mp3,wav,mpeg|max:51200']);
+    //     } else {
+    //         $request->validate(['file' => 'required|image|max:5120']);
+    //     }
+
+    //     try {
+    //         // Derive Brazil publish date for R2 folder path
+    //         $mainData = $this->firestore->getDailyLight($id);
+    //         $utcDt = $mainData['main']['publishDateTimeUtc']['stringValue'] ?? '';
+    //         $publishDate = $utcDt
+    //             ? DateTimeService::utcToBrazil($utcDt)->format('Y-m-d')
+    //             : ($mainData['main']['date']['stringValue'] ?? $id);
+
+    //         $uploaded = $this->fileStorage->uploadDailyLightFile($file, $publishDate, $lang, $step);
+
+    //         $result = ['success' => true, 'storageKey' => $uploaded['storage_key']];
+
+    //         // Include audio duration for audio files
+    //         if ($type === 'audio') {
+    //             $result['audioDuration'] = $this->getAudioDuration($file->getPathname());
+    //         }
+
+    //         return response()->json($result);
+    //     } catch (\Exception $e) {
+    //         \Log::error('Daily Light uploadFile exception', ['lang' => $lang, 'step' => $step, 'type' => $type, 'error' => $e->getMessage()]);
+    //         return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+    //     }
+    // }
+
     public function uploadFile(Request $request, string $id)
     {
-        ini_set('max_execution_time', 120);
-        ini_set('memory_limit', '256M');
-        set_time_limit(120);
+        $request->validate([
+            'file_name' => 'required',
+            'file_type' => 'required',
+            'lang' => 'required|in:pt,en,es',
+            'step' => 'required|integer|min:1|max:5',
+            'type' => 'required|in:image,bgImage,audio',
+        ]);
 
-        $lang = $request->input('lang');
-        $step = (int) $request->input('step');
-        $type = $request->input('type'); // image, bgImage, audio
+        $lang = $request->lang;
+        $step = $request->step;
+        $type = $request->type;
 
-        if (!in_array($lang, ['pt', 'en', 'es']) || $step < 1 || $step > 5 || !in_array($type, ['image', 'bgImage', 'audio'])) {
-            return response()->json(['success' => false, 'message' => 'Invalid parameters.'], 422);
-        }
-
-        if (!$request->hasFile('file')) {
-            return response()->json(['success' => false, 'message' => 'No file provided.'], 422);
-        }
-
-        $file = $request->file('file');
-
-        // Validate based on type
-        if ($type === 'audio') {
-            $request->validate(['file' => 'required|file|mimes:mp3,wav,mpeg|max:51200']);
-        } else {
-            $request->validate(['file' => 'required|image|max:5120']);
-        }
+        $fileName = time() . '_' . preg_replace('/\s+/', '_', $request->file_name);
 
         try {
-            // Derive Brazil publish date for R2 folder path
+
+            // Get publish date
             $mainData = $this->firestore->getDailyLight($id);
+
             $utcDt = $mainData['main']['publishDateTimeUtc']['stringValue'] ?? '';
+
             $publishDate = $utcDt
                 ? DateTimeService::utcToBrazil($utcDt)->format('Y-m-d')
                 : ($mainData['main']['date']['stringValue'] ?? $id);
 
-            $uploaded = $this->fileStorage->uploadDailyLightFile($file, $publishDate, $lang, $step);
+            // Generate storage path
+            $key = "daily-light/{$publishDate}/{$lang}/step{$step}/{$type}/{$fileName}";
 
-            $result = ['success' => true, 'storageKey' => $uploaded['storage_key']];
+            $s3 = new S3Client([
+                'version' => 'latest',
+                'region' => env('R2_REGION'),
+                'endpoint' => env('R2_ENDPOINT'),
+                'credentials' => [
+                    'key' => env('R2_ACCESS_KEY_ID'),
+                    'secret' => env('R2_SECRET_ACCESS_KEY'),
+                ],
+            ]);
 
-            // Include audio duration for audio files
-            if ($type === 'audio') {
-                $result['audioDuration'] = $this->getAudioDuration($file->getPathname());
-            }
+            $command = $s3->getCommand('PutObject', [
+                'Bucket' => env('R2_BUCKET'),
+                'Key' => $key,
+                'ContentType' => $request->file_type,
+            ]);
 
-            return response()->json($result);
+            $signedUrl = $s3->createPresignedRequest($command, '+20 minutes');
+
+            return response()->json([
+                'success' => true,
+                'upload_url' => (string) $signedUrl->getUri(),
+                'storage_key' => $key,
+            ]);
+
         } catch (\Exception $e) {
-            \Log::error('Daily Light uploadFile exception', ['lang' => $lang, 'step' => $step, 'type' => $type, 'error' => $e->getMessage()]);
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+
+            \Log::error('Daily Light uploadFile exception', [
+                'lang' => $lang,
+                'step' => $step,
+                'type' => $type,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
 
@@ -607,6 +678,7 @@ class DailyLightController extends Controller
             'date' => $formDate,
             'publishTime' => $formTime,
             'status' => $mainFields['status']['stringValue'] ?? 'draft',
+            'isFeatured' => ($mainFields['isFeatured']['booleanValue'] ?? false) === true,
             'translations' => [],
         ];
 
@@ -1065,7 +1137,6 @@ class DailyLightController extends Controller
                 $stepFields['category_id'] = ['stringValue' => (string) ($request->input("step_category_{$lang}_{$i}") ?? '')];
             }
 
-            // Save forSubscribeMember inside Step 5 data
             if ($i === 5) {
                 $stepFields['forSubscribeMember'] = ['booleanValue' => $request->boolean("forSubscribeMember_{$lang}")];
             }

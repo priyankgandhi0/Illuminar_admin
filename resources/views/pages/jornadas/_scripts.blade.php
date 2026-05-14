@@ -435,8 +435,12 @@ $(document).ready(function() {
     }
 
     // ---- Form Submit ----
+    var isSaving = false;
+
     $('#jornadaForm').on('submit', function(e) {
         e.preventDefault();
+
+        if (isSaving) return; // block double submission
 
         // Clear previous errors
         $('.dl-validate-field').removeClass('is-invalid');
@@ -485,6 +489,7 @@ $(document).ready(function() {
         }
 
         // All valid - start sequential AJAX save
+        isSaving = true;
         doSequentialSave(enabledLangs);
     });
 
@@ -519,6 +524,7 @@ $(document).ready(function() {
             contentType: false,
             success: function(res) {
                 if (!res.success) {
+                    isSaving = false;
                     $('#dlOverlayLoader').removeClass('active');
                     toastr.error(res.message || Lang.something_wrong);
                     return;
@@ -526,6 +532,7 @@ $(document).ready(function() {
                 saveLangsSequentially(res.docId, res.lessonDocId, enabledLangs, 0);
             },
             error: function(xhr) {
+                isSaving = false;
                 $('#dlOverlayLoader').removeClass('active');
                 var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : Lang.something_wrong;
                 toastr.error(msg);
@@ -535,10 +542,11 @@ $(document).ready(function() {
 
     function saveLangsSequentially(docId, lessonDocId, langs, index) {
         if (index >= langs.length) {
-            $('#dlLoaderText').text(Lang.save_complete);
+            $('#dlOverlayLoader').removeClass('active');
+            toastr.success(Lang.save_complete);
             setTimeout(function() {
                 window.location.href = '{{ route("jornadas.index") }}';
-            }, 500);
+            }, 2000);
             return;
         }
 
@@ -553,43 +561,113 @@ $(document).ready(function() {
             uploadLessonsSequentially(uploadUrl, lang, 0, getLessonCount(lang), [], function(audioResults) {
                 saveLangData(docId, lessonDocId, lang, coverKey, audioResults, langs, index);
             }, function() {
+                isSaving = false;
                 $('#dlOverlayLoader').removeClass('active');
                 toastr.error(Lang.upload_failed.replace(':lang', langNames[lang]));
             });
         }, function() {
+            isSaving = false;
             $('#dlOverlayLoader').removeClass('active');
             toastr.error(Lang.upload_failed.replace(':lang', langNames[lang]));
         });
     }
 
+    // function uploadCoverImage(uploadUrl, lang, onSuccess, onError) {
+    //     var coverInput = document.getElementById('coverInput_' + lang);
+    //     if (!coverInput || !coverInput.files || coverInput.files.length === 0) {
+    //         onSuccess('');
+    //         return;
+    //     }
+
+    //     var fd = new FormData();
+    //     fd.append('_token', getCsrf());
+    //     fd.append('file', coverInput.files[0]);
+    //     fd.append('lang', lang);
+    //     fd.append('type', 'cover_image');
+
+    //     $('#dlLoaderText').text(Lang.uploading_file.replace(':lang', langNames[lang]).replace(':current', '1').replace(':total', '1'));
+
+    //     $.ajax({
+    //         url: uploadUrl,
+    //         method: 'POST',
+    //         data: fd,
+    //         processData: false,
+    //         contentType: false,
+    //         timeout: 120000,
+    //         success: function(res) {
+    //             if (res.success) { onSuccess(res.storage_key); }
+    //             else { onError(res.message); }
+    //         },
+    //         error: function(xhr) {
+    //             onError((xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : Lang.something_wrong);
+    //         }
+    //     });
+    // }
+
     function uploadCoverImage(uploadUrl, lang, onSuccess, onError) {
+
         var coverInput = document.getElementById('coverInput_' + lang);
+
         if (!coverInput || !coverInput.files || coverInput.files.length === 0) {
             onSuccess('');
             return;
         }
 
-        var fd = new FormData();
-        fd.append('_token', getCsrf());
-        fd.append('file', coverInput.files[0]);
-        fd.append('lang', lang);
-        fd.append('type', 'cover_image');
+        var file = coverInput.files[0];
 
-        $('#dlLoaderText').text(Lang.uploading_file.replace(':lang', langNames[lang]).replace(':current', '1').replace(':total', '1'));
+        $('#dlLoaderText').text(
+            Lang.uploading_file
+                .replace(':lang', langNames[lang])
+                .replace(':current', '1')
+                .replace(':total', '1')
+        );
 
+        // STEP 1: Get signed URL from Laravel
         $.ajax({
             url: uploadUrl,
             method: 'POST',
-            data: fd,
-            processData: false,
-            contentType: false,
-            timeout: 120000,
-            success: function(res) {
-                if (res.success) { onSuccess(res.storage_key); }
-                else { onError(res.message); }
+            data: {
+                _token: getCsrf(),
+                file_name: file.name,
+                file_type: file.type,
+                lang: lang,
+                type: 'cover_image'
             },
+
+            success: function(res) {
+
+                if (!res.success) {
+                    onError(res.message || 'Failed to get upload URL');
+                    return;
+                }
+
+                // STEP 2: Direct upload to Cloudflare R2
+                fetch(res.upload_url, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': file.type
+                    },
+                    body: file
+                })
+                .then(response => {
+
+                    if (!response.ok) {
+                        throw new Error('Upload failed');
+                    }
+
+                    onSuccess(res.storage_key);
+                })
+                .catch(error => {
+                    onError(error.message);
+                });
+            },
+
             error: function(xhr) {
-                onError((xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : Lang.something_wrong);
+                onError(
+                    (xhr.responseJSON && xhr.responseJSON.message)
+                        ? xhr.responseJSON.message
+                        : Lang.something_wrong
+                );
             }
         });
     }
@@ -615,49 +693,135 @@ $(document).ready(function() {
         }, onError);
     }
 
+    // function uploadLessonWithRetry(uploadUrl, lang, index, count, file, attempt, onSuccess, onError) {
+    //     var maxAttempts = 3;
+
+    //     var fd = new FormData();
+    //     fd.append('_token', getCsrf());
+    //     fd.append('file', file);
+    //     fd.append('lang', lang);
+    //     fd.append('type', 'lesson_audio');
+    //     fd.append('lesson_index', index);
+
+    //     var attemptLabel = attempt > 0 ? ' (tentativa ' + (attempt + 1) + ')' : '';
+    //     $('#dlLoaderText').text(Lang.uploading_file.replace(':lang', langNames[lang]).replace(':current', (index + 1)).replace(':total', count) + attemptLabel);
+
+    //     $.ajax({
+    //         url: uploadUrl,
+    //         method: 'POST',
+    //         data: fd,
+    //         processData: false,
+    //         contentType: false,
+    //         timeout: 280000, // 280 seconds (matches server max_execution_time)
+    //         success: function(res) {
+    //             if (res.success) {
+    //                 onSuccess(res.storage_key, res.audio_duration || '00:00');
+    //             } else {
+    //                 if (attempt + 1 < maxAttempts) {
+    //                     setTimeout(function() {
+    //                         uploadLessonWithRetry(uploadUrl, lang, index, count, file, attempt + 1, onSuccess, onError);
+    //                     }, 2000);
+    //                 } else {
+    //                     onError(res.message);
+    //                 }
+    //             }
+    //         },
+    //         error: function(xhr) {
+    //             if (attempt + 1 < maxAttempts) {
+    //                 setTimeout(function() {
+    //                     uploadLessonWithRetry(uploadUrl, lang, index, count, file, attempt + 1, onSuccess, onError);
+    //                 }, 2000);
+    //             } else {
+    //                 onError((xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : Lang.something_wrong);
+    //             }
+    //         }
+    //     });
+    // }
+
     function uploadLessonWithRetry(uploadUrl, lang, index, count, file, attempt, onSuccess, onError) {
+
         var maxAttempts = 3;
 
-        var fd = new FormData();
-        fd.append('_token', getCsrf());
-        fd.append('file', file);
-        fd.append('lang', lang);
-        fd.append('type', 'lesson_audio');
-        fd.append('lesson_index', index);
-
         var attemptLabel = attempt > 0 ? ' (tentativa ' + (attempt + 1) + ')' : '';
-        $('#dlLoaderText').text(Lang.uploading_file.replace(':lang', langNames[lang]).replace(':current', (index + 1)).replace(':total', count) + attemptLabel);
 
+        $('#dlLoaderText').text(
+            Lang.uploading_file
+                .replace(':lang', langNames[lang])
+                .replace(':current', (index + 1))
+                .replace(':total', count) + attemptLabel
+        );
+
+        // STEP 1: GET SIGNED URL FROM LARAVEL
         $.ajax({
             url: uploadUrl,
             method: 'POST',
-            data: fd,
-            processData: false,
-            contentType: false,
-            timeout: 280000, // 280 seconds (matches server max_execution_time)
-            success: function(res) {
-                if (res.success) {
-                    onSuccess(res.storage_key, res.audio_duration || '00:00');
-                } else {
-                    if (attempt + 1 < maxAttempts) {
-                        setTimeout(function() {
-                            uploadLessonWithRetry(uploadUrl, lang, index, count, file, attempt + 1, onSuccess, onError);
-                        }, 2000);
-                    } else {
-                        onError(res.message);
-                    }
-                }
+            data: {
+                _token: getCsrf(),
+                file_name: file.name,
+                file_type: file.type,
+                lang: lang,
+                type: 'lesson_audio',
+                lesson_index: index
             },
-            error: function(xhr) {
-                if (attempt + 1 < maxAttempts) {
-                    setTimeout(function() {
-                        uploadLessonWithRetry(uploadUrl, lang, index, count, file, attempt + 1, onSuccess, onError);
-                    }, 2000);
-                } else {
-                    onError((xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : Lang.something_wrong);
+
+            success: function(res) {
+
+                if (!res.success) {
+
+                    retryOrFail();
+                    return;
                 }
+
+                // STEP 2: DIRECT UPLOAD TO CLOUD STORAGE
+                fetch(res.upload_url, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': file.type
+                    },
+                    body: file
+                })
+                .then(response => {
+
+                    if (!response.ok) {
+                        throw new Error('Upload failed');
+                    }
+
+                    onSuccess(res.storage_key, '00:00'); // duration optional
+
+                })
+                .catch(err => {
+                    retryOrFail();
+                });
+            },
+
+            error: function() {
+                retryOrFail();
             }
         });
+
+        function retryOrFail() {
+
+            if (attempt + 1 < maxAttempts) {
+
+                setTimeout(function() {
+
+                    uploadLessonWithRetry(
+                        uploadUrl,
+                        lang,
+                        index,
+                        count,
+                        file,
+                        attempt + 1,
+                        onSuccess,
+                        onError
+                    );
+
+                }, 2000);
+
+            } else {
+                onError('Upload failed after retries');
+            }
+        }
     }
 
     function saveLangData(docId, lessonDocId, lang, coverKey, audioResults, langs, index) {
@@ -703,11 +867,13 @@ $(document).ready(function() {
                 if (res.success) {
                     saveLangsSequentially(docId, lessonDocId, langs, index + 1);
                 } else {
+                    isSaving = false;
                     $('#dlOverlayLoader').removeClass('active');
                     toastr.error(res.message || Lang.save_failed_lang.replace(':lang', langNames[lang]));
                 }
             },
             error: function(xhr) {
+                isSaving = false;
                 $('#dlOverlayLoader').removeClass('active');
                 var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : Lang.something_wrong;
                 toastr.error(msg);
